@@ -1,0 +1,11 @@
+server:
+  port: 8081
+database:
+  url: 127.0.0.1:3306
+  userName: root
+  password: 137238fh
+  databaseName: mesence
+  maxConn: 10
+  maxOpen: 100
+jwt:
+  secret: DkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM
