@@ -97,3 +97,9 @@ func (conn *UserConn) Close() {
 		log.Info("Connection already closed: %v", conn)
 	}
 }
+
+var UserConnMap map[string]*UserConn
+
+func init() {
+	UserConnMap = make(map[string]*UserConn)
+}
