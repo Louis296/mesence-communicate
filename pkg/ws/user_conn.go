@@ -75,7 +75,7 @@ func (conn *UserConn) StartReadMessage() {
 				return
 			}
 		case message := <-in:
-			log.Info("Receive data: %v from user [%v]", message, conn.UserPhone)
+			log.Info("Receive data: %v from user [%v]", string(message), conn.UserPhone)
 			conn.Emit("message", message)
 		}
 	}
