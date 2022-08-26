@@ -20,7 +20,8 @@ func WebSocketHandler(c *gin.Context) {
 	}
 	userConn := ws.NewUserConn(socket)
 	//c.Get(enum.CurrentUser)
-	userConn.UserPhone = "test"
+	phone, _ := c.GetQuery("phone")
+	userConn.UserPhone = phone
 	service.UserConnHandler(userConn)
 	userConn.StartReadMessage()
 }

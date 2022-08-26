@@ -12,7 +12,10 @@ import (
 )
 
 // heart package send time
-const pingPeriod = 30 * time.Second
+const pingPeriod = 10 * time.Second
+
+// UserConnMap is a sync.Map to store use conn
+var UserConnMap sync.Map
 
 type UserConn struct {
 	emission.Emitter
@@ -31,7 +34,6 @@ func NewUserConn(socket *websocket.Conn) *UserConn {
 	}
 	// closed by client
 	conn.socket.SetCloseHandler(func(code int, text string) error {
-		log.Warn("[UserConnClose]--%d--%s", code, text)
 		conn.Emit("close", code, text)
 		conn.closed = true
 		return nil
@@ -96,10 +98,4 @@ func (conn *UserConn) Close() {
 	} else {
 		log.Info("Connection already closed: %v", conn)
 	}
-}
-
-var UserConnMap map[string]*UserConn
-
-func init() {
-	UserConnMap = make(map[string]*UserConn)
 }
