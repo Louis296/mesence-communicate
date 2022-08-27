@@ -29,6 +29,6 @@ type FriendRequestData struct {
 	Sender        string
 	Candidate     string
 	Content       string
-	SendTime      string
+	StartTime     string
 	RequestStatus string
 }

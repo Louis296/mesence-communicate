@@ -8,14 +8,14 @@ import (
 var Secret string
 
 type Claims struct {
-	Email string
+	Phone string
 	Name  string
 	jwt.StandardClaims
 }
 
-func GenerateToken(email, name string) (string, error) {
+func GenerateToken(phone, name string) (string, error) {
 	claims := Claims{
-		Email: email,
+		Phone: phone,
 		Name:  name,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),

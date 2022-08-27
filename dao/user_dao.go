@@ -2,7 +2,7 @@ package dao
 
 import "github.com/louis296/mesence-communicate/dao/model"
 
-func GetUserByUserPhone(phone string) (*model.User, error) {
+func GetUserByPhone(phone string) (*model.User, error) {
 	sql := DB
 	ans := &model.User{}
 	sql = sql.Model(&model.User{})

@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"github.com/louis296/mesence-communicate/pkg/enum"
+	"time"
+)
 
 type FriendRequest struct {
 	Base
@@ -13,4 +16,24 @@ type FriendRequest struct {
 
 func (m *FriendRequest) TableName() string {
 	return "friend_request"
+}
+
+type FriendRequestResp struct {
+	Id            int
+	Sender        string
+	Candidate     string
+	RequestStatus string
+	StartTime     time.Time
+	Content       string
+}
+
+func (m *FriendRequest) GenResp() FriendRequestResp {
+	return FriendRequestResp{
+		Id:            m.Id,
+		Sender:        m.Sender,
+		Candidate:     m.Candidate,
+		RequestStatus: enum.FriendRequestStatusMap[m.RequestStatus],
+		StartTime:     m.StartTime,
+		Content:       m.Content,
+	}
 }

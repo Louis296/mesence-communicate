@@ -6,12 +6,15 @@ import (
 	"github.com/louis296/mesence-communicate/conf"
 	"github.com/louis296/mesence-communicate/dao"
 	"github.com/louis296/mesence-communicate/handler"
+	"github.com/louis296/mesence-communicate/middleware"
 	"github.com/louis296/mesence-communicate/pkg/jwt"
 )
 
 func Init(r *gin.Engine) {
 
 	// init router
+	r.POST("/login", handler.UserLogin)
+	r.Use(middleware.JWT())
 	r.Any("/v1", gin_helper.MainHandler(nil, handler.Handler{}))
 
 	// init websocket handler

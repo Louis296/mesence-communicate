@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/louis296/mesence-communicate/dao"
+	"github.com/louis296/mesence-communicate/pkg/enum"
 	"github.com/louis296/mesence-communicate/pkg/jwt"
 	"time"
 )
@@ -15,11 +17,11 @@ func JWT() gin.HandlerFunc {
 			claims, err := jwt.ParseToken(token)
 			if err == nil {
 				if claims.ExpiresAt > time.Now().Unix() {
-					//user := dao.GetUserByEmail(claims.Email)
-					//if user != nil {
-					//	valid = true
-					//	c.Set(enum.CurrentUser, user)
-					//}
+					user, _ := dao.GetUserByPhone(claims.Phone)
+					if user != nil {
+						valid = true
+						c.Set(enum.CurrentUser, user)
+					}
 				}
 			}
 		}

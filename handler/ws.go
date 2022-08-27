@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/louis296/mesence-communicate/pkg/log"
+	"github.com/louis296/mesence-communicate/pkg/util"
 	"github.com/louis296/mesence-communicate/pkg/ws"
 	"github.com/louis296/mesence-communicate/service/communicate_service"
 	"net/http"
@@ -19,9 +20,8 @@ func WebSocketHandler(c *gin.Context) {
 		log.Panic("%v", err)
 	}
 	userConn := ws.NewUserConn(socket)
-	//c.Get(enum.CurrentUser)
-	phone, _ := c.GetQuery("phone")
-	userConn.UserPhone = phone
+	user := util.MustGetCurrentUser(c)
+	userConn.UserPhone = user.Phone
 	communicate_service.UserConnHandler(userConn)
 	userConn.StartReadMessage()
 }

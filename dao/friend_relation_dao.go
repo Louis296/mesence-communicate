@@ -1,6 +1,14 @@
 package dao
 
-import "github.com/louis296/mesence-communicate/dao/model"
+import (
+	"github.com/louis296/mesence-communicate/dao/model"
+	"gorm.io/gorm"
+)
+
+func CreateFriendRelation(tx *gorm.DB, relation model.FriendRelation) error {
+	tx = tx.Create(&relation)
+	return tx.Error
+}
 
 func GetFriendRelationsByUserPhone(phone string) ([]model.FriendRelation, error) {
 	sql := DB

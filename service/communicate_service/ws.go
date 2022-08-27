@@ -36,7 +36,7 @@ func UserConnHandler(conn *ws.UserConn) {
 		case enum.WordPackageMessageType:
 			onWord(conn, message)
 		case enum.FriendRequestMessageType:
-			onFriendRequest(conn, msg)
+			onFriendRequest(conn, message)
 		}
 	})
 
@@ -63,7 +63,7 @@ func onWord(conn *ws.UserConn, message []byte) {
 	data := msg.Data
 
 	// check if receiver is valid
-	_, err = dao.GetUserByUserPhone(data.To)
+	_, err = dao.GetUserByPhone(data.To)
 	if err != nil {
 		log.Error("No user [%v] or db error, send word message abort", data.To)
 		return
@@ -102,12 +102,66 @@ func onWord(conn *ws.UserConn, message []byte) {
 			log.Error("Send word message to user [%v] error", receiverConn.UserPhone)
 		}
 	} else {
-		log.Warn("Word message [%v] receiver is offline, send abort", data.To)
+		log.Warn("Word message receiver [%v] is offline, send abort", data.To)
 	}
 }
 
-func onFriendRequest(conn *ws.UserConn, message ws.Message) {
+func onFriendRequest(conn *ws.UserConn, message []byte) {
+	var msg FriendRequestMessage
+	err := json.Unmarshal(message, &msg)
+	if err != nil {
+		log.Error("Cannot unmarshal data from user [%v], message: %v", conn.UserPhone, string(message))
+	}
+	data := msg.Data
 
+	// check if candidate is valid
+	_, err = dao.GetUserByPhone(data.Candidate)
+	if err != nil {
+		log.Error("No user [%v] or db error, send word message abort", data.Candidate)
+		return
+	}
+
+	// store friend request
+	friendRequest := model.FriendRequest{
+		Sender:        conn.UserPhone,
+		Candidate:     data.Candidate,
+		RequestStatus: 0,
+		StartTime:     util.TimeParse(data.StartTime),
+		Content:       data.Content,
+	}
+	tx := dao.DB.Begin()
+	defer func() {
+		if tx.Error != nil {
+			tx.Rollback()
+		} else if recover() != nil {
+			tx.Rollback()
+		} else {
+			tx.Commit()
+		}
+	}()
+	if err = dao.CreateFriendRequest(tx, friendRequest); err != nil {
+		log.Error("Store request to db error")
+		return
+	}
+
+	// try to send friend request notice
+	if item, ok := ws.UserConnMap.Load(data.Candidate); ok {
+		candidateConn := item.(*ws.UserConn)
+		notice := ws.Message{Type: enum.FriendRequestMessageType}
+		notice.Data = FriendRequestData{
+			Sender:        conn.UserPhone,
+			Candidate:     data.Candidate,
+			Content:       data.Content,
+			StartTime:     data.StartTime,
+			RequestStatus: enum.FriendRequestStatusMap[0],
+		}
+		err = candidateConn.Send(util.Marshal(notice))
+		if err != nil {
+			log.Error("Send word message to user [%v] error", candidateConn.UserPhone)
+		}
+	} else {
+		log.Warn("Friend request receiver [%v] is offline, send abort", data.Candidate)
+	}
 }
 
 func onlineNotify(conn *ws.UserConn, userPhones []string) {
