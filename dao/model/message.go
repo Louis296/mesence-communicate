@@ -13,3 +13,21 @@ type Message struct {
 func (m *Message) TableName() string {
 	return "message"
 }
+
+type MessageResp struct {
+	Id       int
+	Content  string
+	From     string
+	To       string
+	SendTime time.Time
+}
+
+func (m *Message) GenResp() MessageResp {
+	return MessageResp{
+		Id:       m.Id,
+		Content:  m.Content,
+		From:     m.From,
+		To:       m.To,
+		SendTime: m.SendTime,
+	}
+}
