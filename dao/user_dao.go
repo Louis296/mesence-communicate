@@ -12,3 +12,18 @@ func GetUserByPhone(phone string) (*model.User, error) {
 	}
 	return ans, nil
 }
+
+func GetUserIdLookupByIds(userIds []int) (map[int]model.User, error) {
+	sql := DB
+	var res []model.User
+	sql = sql.Model(&model.User{})
+	err := sql.Where("id in", userIds).Scan(&res).Error
+	if err != nil {
+		return nil, err
+	}
+	ans := make(map[int]model.User)
+	for _, item := range res {
+		ans[item.Id] = item
+	}
+	return ans, nil
+}

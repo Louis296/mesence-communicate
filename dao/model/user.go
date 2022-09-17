@@ -12,3 +12,21 @@ type User struct {
 func (m *User) TableName() string {
 	return "user"
 }
+
+type UserResp struct {
+	Id       int
+	Phone    string
+	Name     string
+	Avatar   string
+	Location string
+}
+
+func (m User) GenResp() UserResp {
+	return UserResp{
+		Id:       m.Id,
+		Phone:    m.Phone,
+		Name:     m.Name,
+		Avatar:   m.Avatar,
+		Location: m.Location,
+	}
+}

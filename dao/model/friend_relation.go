@@ -12,3 +12,14 @@ type FriendRelation struct {
 func (m *FriendRelation) TableName() string {
 	return "friend_relation"
 }
+
+type FriendRelationResp struct {
+	Friend         UserResp
+	FriendNoteName string
+}
+
+func (m FriendRelation) GenResp() FriendRelationResp {
+	return FriendRelationResp{
+		FriendNoteName: m.FriendNoteName,
+	}
+}
