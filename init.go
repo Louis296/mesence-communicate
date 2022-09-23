@@ -13,6 +13,7 @@ import (
 func Init(r *gin.Engine) {
 
 	// init router
+	r.Use(middleware.Cors())
 	r.POST("/login", handler.UserLogin)
 	r.Use(middleware.JWT())
 	r.Any("/v1", gin_helper.MainHandler(nil, handler.Handler{}))
