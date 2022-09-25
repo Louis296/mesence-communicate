@@ -8,3 +8,7 @@ import (
 func UserLogin(c *gin.Context) {
 	handler(c, &user_service.UserLoginReq{})
 }
+
+func (h Handler) GetUserInfo20220101(c *gin.Context) {
+	handler(c, &user_service.GetUserInfoReq{})
+}

@@ -17,7 +17,7 @@ func GetUserIdLookupByIds(userIds []int) (map[int]model.User, error) {
 	sql := DB
 	var res []model.User
 	sql = sql.Model(&model.User{})
-	err := sql.Where("id in", userIds).Scan(&res).Error
+	err := sql.Where("id in ?", userIds).Scan(&res).Error
 	if err != nil {
 		return nil, err
 	}

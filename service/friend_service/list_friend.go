@@ -32,6 +32,7 @@ func (r *ListFriendReq) Handler(c *gin.Context) (interface{}, error) {
 	for _, relation := range relations {
 		resp := relation.GenResp()
 		resp.Friend = friendLookup[relation.FriendID].GenResp()
+		respList = append(respList, resp)
 	}
 	return ListFriendResp{List: respList}, nil
 }
