@@ -12,14 +12,14 @@ import (
 
 func Init(r *gin.Engine) {
 
+	// init websocket handler
+	r.GET("/ws", handler.WebSocketHandler)
+
 	// init router
 	r.Use(middleware.Cors())
 	r.POST("/login", handler.UserLogin)
 	r.Use(middleware.JWT())
 	r.Any("/v1", gin_helper.MainHandler(nil, handler.Handler{}))
-
-	// init websocket handler
-	r.GET("/ws", handler.WebSocketHandler)
 
 	// init configure
 	configure, err := conf.GetConf()
