@@ -70,8 +70,6 @@ func (conn *UserConn) StartReadMessage() {
 			if err := conn.Send(util.Marshal(heartPackage)); err != nil {
 				log.Error("Send heart package error on user [%v] conn", conn.UserPhone)
 				pingTicker.Stop()
-				conn.Emit("close", 1000, "cannot send heart package")
-				//conn.Close()
 				return
 			}
 		case message := <-in:
