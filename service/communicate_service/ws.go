@@ -37,6 +37,12 @@ func UserConnHandler(conn *ws.UserConn) {
 			onWord(conn, message)
 		case enum.FriendRequestMessageType:
 			onFriendRequest(conn, message)
+		case enum.Offer:
+			fallthrough
+		case enum.Answer:
+			fallthrough
+		case enum.Candidate:
+			onTransfer(conn, message)
 		}
 	})
 
@@ -161,6 +167,24 @@ func onFriendRequest(conn *ws.UserConn, message []byte) {
 		}
 	} else {
 		log.Warn("Friend request receiver [%v] is offline, send abort", data.Candidate)
+	}
+}
+
+func onTransfer(conn *ws.UserConn, message []byte) {
+	var msg TransferMessage
+	err := json.Unmarshal(message, &msg)
+	if err != nil {
+		log.Error("Cannot unmarshal data from user [%v], message: %v", conn.UserPhone, string(message))
+	}
+	if item, ok := ws.UserConnMap.Load(msg.Data.To); ok {
+		receiverConn := item.(*ws.UserConn)
+		msg.Data.From = conn.UserPhone
+		err := receiverConn.Send(util.Marshal(msg))
+		if err != nil {
+			log.Error("Send word message to user [%v] error", receiverConn.UserPhone)
+		}
+	} else {
+		log.Warn("Word message receiver [%v] is offline, send abort", msg.Data.To)
 	}
 }
 

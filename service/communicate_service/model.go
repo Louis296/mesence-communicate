@@ -18,6 +18,11 @@ type FriendRequestMessage struct {
 	Data FriendRequestData
 }
 
+type TransferMessage struct {
+	Type string
+	Data TransferData
+}
+
 type WordMessageData struct {
 	To       string
 	From     string
@@ -31,4 +36,10 @@ type FriendRequestData struct {
 	Content       string
 	StartTime     string
 	RequestStatus string
+}
+
+type TransferData struct {
+	To      string
+	From    string
+	Content interface{}
 }

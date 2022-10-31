@@ -6,6 +6,10 @@ const (
 	OnlineMessageType        = "online"
 	OfflineMessageType       = "offline"
 	FriendRequestMessageType = "friendRequest"
+	Offer                    = "offer"
+	Answer                   = "answer"
+	Candidate                = "candidate"
+	HangUp                   = "hangUp"
 )
 
 var FriendRequestStatusMap = map[int]string{
