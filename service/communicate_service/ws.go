@@ -5,6 +5,7 @@ import (
 	"github.com/louis296/mesence-communicate/dao"
 	"github.com/louis296/mesence-communicate/dao/model"
 	"github.com/louis296/mesence-communicate/pkg/log"
+	"github.com/louis296/mesence-communicate/pkg/mongodb"
 	"github.com/louis296/mesence-communicate/pkg/pb"
 	"github.com/louis296/mesence-communicate/pkg/util"
 	"github.com/louis296/mesence-communicate/pkg/ws"
@@ -66,30 +67,15 @@ func onWord(conn *ws.UserConn, msg *pb.Msg) {
 	// check if receiver is valid
 	_, err := dao.GetUserByPhone(data.To)
 	if err != nil {
-		log.Error("No user [%v] or db error, send word message abort", data.To)
+		log.Error("No user [%v] or mongodb error, send word message abort", data.To)
 		return
 	}
 
 	// store message
-	tx := dao.DB.Begin()
-	defer func() {
-		if tx.Error != nil {
-			tx.Rollback()
-		} else if recover() != nil {
-			tx.Rollback()
-		} else {
-			tx.Commit()
-		}
-	}()
-	recordMsg := model.Message{
-		Content:  data.Content,
-		From:     conn.UserPhone,
-		To:       data.To,
-		SendTime: util.TimeParse(data.SendTime),
-	}
-	err = dao.CreateMessage(recordMsg, tx)
+	err = mongodb.SaveMessage(msg)
 	if err != nil {
-		log.Error("Store message to db error, send word message continue without store")
+		log.Error("Save message error")
+		return
 	}
 
 	// try to send message
@@ -113,7 +99,7 @@ func onFriendRequest(conn *ws.UserConn, msg *pb.Msg) {
 	// check if candidate is valid
 	_, err := dao.GetUserByPhone(data.To)
 	if err != nil {
-		log.Error("No user [%v] or db error, send word message abort", data.Candidate)
+		log.Error("No user [%v] or mongodb error, send word message abort", data.Candidate)
 		return
 	}
 
@@ -136,7 +122,7 @@ func onFriendRequest(conn *ws.UserConn, msg *pb.Msg) {
 		}
 	}()
 	if err = dao.CreateFriendRequest(tx, friendRequest); err != nil {
-		log.Error("Store request to db error")
+		log.Error("Store request to mongodb error")
 		return
 	}
 

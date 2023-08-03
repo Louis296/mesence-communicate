@@ -9,6 +9,7 @@ import (
 	"github.com/louis296/mesence-communicate/handler"
 	"github.com/louis296/mesence-communicate/middleware"
 	"github.com/louis296/mesence-communicate/pkg/jwt"
+	"github.com/louis296/mesence-communicate/pkg/mongodb"
 )
 
 func Init(r *gin.Engine) {
@@ -43,6 +44,12 @@ func Init(r *gin.Engine) {
 
 	// set jwt secret
 	jwt.Secret = configure.Jwt.Secret
+
+	// init mongodb
+	err = mongodb.InitClient(configure.MongoDB.Url)
+	if err != nil {
+		panic(err.Error())
+	}
 
 	err = r.Run(fmt.Sprintf(":%v", configure.Server.Port))
 	if err != nil {

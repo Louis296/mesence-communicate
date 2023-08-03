@@ -2,13 +2,14 @@ package conf
 
 import (
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
+	"os"
 )
 
 type Conf struct {
 	Server   Server   `yaml:"server"`
 	Database Database `yaml:"database"`
 	Jwt      Jwt      `yaml:"jwt"`
+	MongoDB  MongoDB  `yaml:"mongodb"`
 }
 type Server struct {
 	Port int `yaml:"port"`
@@ -24,9 +25,12 @@ type Database struct {
 type Jwt struct {
 	Secret string `yaml:"secret"`
 }
+type MongoDB struct {
+	Url string `yaml:"url"`
+}
 
 func GetConf() (Conf, error) {
-	file, err := ioutil.ReadFile("conf/conf.yaml")
+	file, err := os.ReadFile("conf/conf.yaml")
 	if err != nil {
 		return Conf{}, err
 	}

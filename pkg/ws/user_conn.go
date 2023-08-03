@@ -16,6 +16,9 @@ const pingPeriod = 10 * time.Second
 
 // UserConnMap is a sync.Map to store use conn
 var UserConnMap sync.Map
+var UserConnPool = sync.Pool{New: func() interface{} {
+	return new(UserConn)
+}}
 
 type UserConn struct {
 	emission.Emitter
@@ -26,19 +29,33 @@ type UserConn struct {
 }
 
 func NewUserConn(socket *websocket.Conn) *UserConn {
-	conn := UserConn{
-		Emitter: *emission.NewEmitter(),
-		socket:  socket,
-		mutex:   new(sync.Mutex),
-		closed:  false,
-	}
+	conn := UserConnPool.Get().(*UserConn)
+	conn.ResetUserConn(
+		*emission.NewEmitter(),
+		socket,
+		new(sync.Mutex),
+		false,
+		"")
 	// closed by client
 	conn.socket.SetCloseHandler(func(code int, text string) error {
 		conn.Emit("close", code, text)
 		conn.closed = true
 		return nil
 	})
-	return &conn
+	return conn
+}
+
+func (conn *UserConn) ResetUserConn(
+	emitter emission.Emitter,
+	socket *websocket.Conn,
+	mutex *sync.Mutex,
+	closed bool,
+	userPhone string) {
+	conn.Emitter = emitter
+	conn.socket = socket
+	conn.mutex = mutex
+	conn.closed = closed
+	conn.UserPhone = userPhone
 }
 
 func (conn *UserConn) StartReadMessage() {
@@ -87,6 +104,7 @@ func (conn *UserConn) Send(bs []byte) error {
 }
 
 func (conn *UserConn) Close() {
+	defer UserConnPool.Put(conn)
 	conn.mutex.Lock()
 	defer conn.mutex.Unlock()
 	if !conn.closed {
