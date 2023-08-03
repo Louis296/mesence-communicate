@@ -16,7 +16,7 @@ var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool {
 }}
 
 func WebSocketHandler(c *gin.Context) {
-	token := c.Query("token")
+	token := c.Query("Token")
 	claims, err := jwt.ParseToken(token)
 	if err != nil || claims.ExpiresAt < time.Now().Unix() {
 		c.JSON(200, gin.H{"Message": "do not have token or token invalid"})

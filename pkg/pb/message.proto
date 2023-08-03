@@ -1,0 +1,36 @@
+syntax="proto3";
+
+option go_package="github.com/louis296/mesence-communicate/pkg/pb";
+
+message Msg{
+  Type type=1;
+  Data data=2;
+}
+
+message Data{
+  string to=1;
+  string from=2;
+  string content=3;
+  string sendTime=4;
+  repeated string onlineUsers=5;
+  repeated string offlineUsers=6;
+  string candidate=7;
+  RequestStatus requestStatus=8;
+}
+
+enum RequestStatus{
+  Accepted=0;
+  Refused=1;
+  Waiting=2;
+}
+
+enum Type{
+  Word=0;
+  Online=1;
+  Offline=2;
+  FriendRequest=3;
+  HeartPackage=4;
+  Offer=5;
+  Answer=6;
+  Candidate=7;
+}

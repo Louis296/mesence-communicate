@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	gin_helper "github.com/louis296/gin-helper"
 	"github.com/louis296/mesence-communicate/conf"
@@ -43,7 +44,7 @@ func Init(r *gin.Engine) {
 	// set jwt secret
 	jwt.Secret = configure.Jwt.Secret
 
-	err = r.Run(":8081")
+	err = r.Run(fmt.Sprintf(":%v", configure.Server.Port))
 	if err != nil {
 		panic("Start gin engine error")
 	}

@@ -1,5 +1,5 @@
 server:
-  port: 8081
+  port: 9010
 database:
   url: 127.0.0.1:3306
   userName: root
@@ -9,3 +9,5 @@ database:
   maxOpen: 100
 jwt:
   secret: DkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM
+mongodb:
+  url: 127.0.0.1:27017

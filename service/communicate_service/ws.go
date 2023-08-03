@@ -1,11 +1,11 @@
 package communicate_service
 
 import (
-	"encoding/json"
+	"github.com/golang/protobuf/proto"
 	"github.com/louis296/mesence-communicate/dao"
 	"github.com/louis296/mesence-communicate/dao/model"
-	"github.com/louis296/mesence-communicate/pkg/enum"
 	"github.com/louis296/mesence-communicate/pkg/log"
+	"github.com/louis296/mesence-communicate/pkg/pb"
 	"github.com/louis296/mesence-communicate/pkg/util"
 	"github.com/louis296/mesence-communicate/pkg/ws"
 )
@@ -26,23 +26,23 @@ func UserConnHandler(conn *ws.UserConn) {
 	onlineNotify(conn, friendPhones)
 
 	// handler message event
-	conn.On("message", func(message []byte) {
-		var msg ws.Message
-		if err := json.Unmarshal(message, &msg); err != nil {
-			log.Error("Cannot unmarshal message from user [%v], message: %v", conn.UserPhone, string(message))
+	conn.On("message", func(bs []byte) {
+		msg := &pb.Msg{}
+		if err := proto.Unmarshal(bs, msg); err != nil {
+			log.Error("Cannot unmarshal message from user [%v], message: %v", conn.UserPhone, bs)
 			return
 		}
 		switch msg.Type {
-		case enum.WordPackageMessageType:
-			onWord(conn, message)
-		case enum.FriendRequestMessageType:
-			onFriendRequest(conn, message)
-		case enum.Offer:
+		case pb.Type_Word:
+			onWord(conn, msg)
+		case pb.Type_FriendRequest:
+			onFriendRequest(conn, msg)
+		case pb.Type_Offer:
 			fallthrough
-		case enum.Answer:
+		case pb.Type_Answer:
 			fallthrough
-		case enum.Candidate:
-			onTransfer(conn, message)
+		case pb.Type_Candidate:
+			onTransfer(conn, msg)
 		}
 	})
 
@@ -60,16 +60,11 @@ func UserConnHandler(conn *ws.UserConn) {
 	})
 }
 
-func onWord(conn *ws.UserConn, message []byte) {
-	var msg WordMessage
-	err := json.Unmarshal(message, &msg)
-	if err != nil {
-		log.Error("Cannot unmarshal data from user [%v], message: %v", conn.UserPhone, string(message))
-	}
+func onWord(conn *ws.UserConn, msg *pb.Msg) {
 	data := msg.Data
 
 	// check if receiver is valid
-	_, err = dao.GetUserByPhone(data.To)
+	_, err := dao.GetUserByPhone(data.To)
 	if err != nil {
 		log.Error("No user [%v] or db error, send word message abort", data.To)
 		return
@@ -100,7 +95,7 @@ func onWord(conn *ws.UserConn, message []byte) {
 	// try to send message
 	if item, ok := ws.UserConnMap.Load(data.To); ok {
 		receiverConn := item.(*ws.UserConn)
-		sendMessage := ws.Message{Type: enum.WordPackageMessageType}
+		sendMessage := &pb.Msg{Type: pb.Type_Word}
 		data.From = conn.UserPhone
 		sendMessage.Data = data
 		err = receiverConn.Send(util.Marshal(sendMessage))
@@ -112,16 +107,11 @@ func onWord(conn *ws.UserConn, message []byte) {
 	}
 }
 
-func onFriendRequest(conn *ws.UserConn, message []byte) {
-	var msg FriendRequestMessage
-	err := json.Unmarshal(message, &msg)
-	if err != nil {
-		log.Error("Cannot unmarshal data from user [%v], message: %v", conn.UserPhone, string(message))
-	}
+func onFriendRequest(conn *ws.UserConn, msg *pb.Msg) {
 	data := msg.Data
 
 	// check if candidate is valid
-	_, err = dao.GetUserByPhone(data.Candidate)
+	_, err := dao.GetUserByPhone(data.To)
 	if err != nil {
 		log.Error("No user [%v] or db error, send word message abort", data.Candidate)
 		return
@@ -130,9 +120,9 @@ func onFriendRequest(conn *ws.UserConn, message []byte) {
 	// store friend request
 	friendRequest := model.FriendRequest{
 		Sender:        conn.UserPhone,
-		Candidate:     data.Candidate,
+		Candidate:     data.To,
 		RequestStatus: 0,
-		StartTime:     util.TimeParse(data.StartTime),
+		StartTime:     util.TimeParse(data.SendTime),
 		Content:       data.Content,
 	}
 	tx := dao.DB.Begin()
@@ -151,15 +141,17 @@ func onFriendRequest(conn *ws.UserConn, message []byte) {
 	}
 
 	// try to send friend request notice
-	if item, ok := ws.UserConnMap.Load(data.Candidate); ok {
+	if item, ok := ws.UserConnMap.Load(data.To); ok {
 		candidateConn := item.(*ws.UserConn)
-		notice := ws.Message{Type: enum.FriendRequestMessageType}
-		notice.Data = FriendRequestData{
-			Sender:        conn.UserPhone,
-			Candidate:     data.Candidate,
-			Content:       data.Content,
-			StartTime:     data.StartTime,
-			RequestStatus: enum.FriendRequestStatusMap[0],
+		notice := &pb.Msg{
+			Type: pb.Type_FriendRequest,
+			Data: &pb.Data{
+				From:          conn.UserPhone,
+				Content:       data.Content,
+				SendTime:      data.SendTime,
+				To:            data.To,
+				RequestStatus: data.RequestStatus,
+			},
 		}
 		err = candidateConn.Send(util.Marshal(notice))
 		if err != nil {
@@ -170,12 +162,7 @@ func onFriendRequest(conn *ws.UserConn, message []byte) {
 	}
 }
 
-func onTransfer(conn *ws.UserConn, message []byte) {
-	var msg TransferMessage
-	err := json.Unmarshal(message, &msg)
-	if err != nil {
-		log.Error("Cannot unmarshal data from user [%v], message: %v", conn.UserPhone, string(message))
-	}
+func onTransfer(conn *ws.UserConn, msg *pb.Msg) {
 	if item, ok := ws.UserConnMap.Load(msg.Data.To); ok {
 		receiverConn := item.(*ws.UserConn)
 		msg.Data.From = conn.UserPhone
@@ -189,9 +176,9 @@ func onTransfer(conn *ws.UserConn, message []byte) {
 }
 
 func onlineNotify(conn *ws.UserConn, userPhones []string) {
-	message := ws.Message{
-		Type: enum.OnlineMessageType,
-		Data: OnlineMessageData{Users: []string{conn.UserPhone}},
+	message := &pb.Msg{
+		Type: pb.Type_Online,
+		Data: &pb.Data{OnlineUsers: []string{conn.UserPhone}},
 	}
 	for _, userPhone := range userPhones {
 		if item, ok := ws.UserConnMap.Load(userPhone); ok {
@@ -204,9 +191,9 @@ func onlineNotify(conn *ws.UserConn, userPhones []string) {
 }
 
 func offlineNotify(conn *ws.UserConn, userPhones []string) {
-	message := ws.Message{
-		Type: enum.OfflineMessageType,
-		Data: OfflineMessageData{Users: []string{conn.UserPhone}},
+	message := &pb.Msg{
+		Type: pb.Type_Offline,
+		Data: &pb.Data{OfflineUsers: []string{conn.UserPhone}},
 	}
 	for _, userPhone := range userPhones {
 		if item, ok := ws.UserConnMap.Load(userPhone); ok {

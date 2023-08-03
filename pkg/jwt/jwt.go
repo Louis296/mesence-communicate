@@ -19,8 +19,8 @@ func GenerateToken(phone, name string) (string, error) {
 		Name:  name,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
-			Subject:   "sunny_weather",
-			Issuer:    "sunny_weather_louis296",
+			Subject:   "mesence",
+			Issuer:    "mesence_louis296",
 		},
 	}
 	tokenClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

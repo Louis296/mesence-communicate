@@ -5,11 +5,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/louis296/mesence-communicate/dao"
 	"github.com/louis296/mesence-communicate/dao/model"
-	"github.com/louis296/mesence-communicate/pkg/enum"
 	"github.com/louis296/mesence-communicate/pkg/log"
+	"github.com/louis296/mesence-communicate/pkg/pb"
 	"github.com/louis296/mesence-communicate/pkg/util"
 	"github.com/louis296/mesence-communicate/pkg/ws"
-	"github.com/louis296/mesence-communicate/service/communicate_service"
 )
 
 type FinishFriendRequestReq struct {
@@ -81,13 +80,15 @@ func (r *FinishFriendRequestReq) Handler(c *gin.Context) (interface{}, error) {
 	// try to notice sender
 	if item, ok := ws.UserConnMap.Load(friendRequest.Sender); ok {
 		senderConn := item.(*ws.UserConn)
-		msg := ws.Message{Type: enum.FriendRequestMessageType}
-		msg.Data = communicate_service.FriendRequestData{
-			Sender:        friendRequest.Sender,
-			Candidate:     friendRequest.Candidate,
-			Content:       friendRequest.Content,
-			StartTime:     util.TimeFormat(friendRequest.StartTime),
-			RequestStatus: enum.FriendRequestStatusMap[friendRequest.RequestStatus],
+		msg := &pb.Msg{
+			Type: pb.Type_FriendRequest,
+			Data: &pb.Data{
+				From:          friendRequest.Sender,
+				Content:       friendRequest.Content,
+				SendTime:      util.TimeFormat(friendRequest.StartTime),
+				Candidate:     friendRequest.Candidate,
+				RequestStatus: pb.RequestStatus(friendRequest.RequestStatus),
+			},
 		}
 		err = senderConn.Send(util.Marshal(msg))
 		if err != nil {

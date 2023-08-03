@@ -1,19 +1,20 @@
 package util
 
 import (
-	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/golang/protobuf/proto"
 	"github.com/louis296/mesence-communicate/dao/model"
 	"github.com/louis296/mesence-communicate/pkg/enum"
 	"github.com/louis296/mesence-communicate/pkg/log"
+	"github.com/louis296/mesence-communicate/pkg/pb"
 	"time"
 )
 
-func Marshal(data interface{}) string {
-	if res, err := json.Marshal(data); err != nil {
-		return ""
+func Marshal(data *pb.Msg) []byte {
+	if res, err := proto.Marshal(data); err != nil {
+		return nil
 	} else {
-		return string(res)
+		return res
 	}
 }
 

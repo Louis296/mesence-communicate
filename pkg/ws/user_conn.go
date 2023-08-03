@@ -3,8 +3,8 @@ package ws
 import (
 	"github.com/chuckpreslar/emission"
 	"github.com/gorilla/websocket"
-	"github.com/louis296/mesence-communicate/pkg/enum"
 	"github.com/louis296/mesence-communicate/pkg/log"
+	"github.com/louis296/mesence-communicate/pkg/pb"
 	"github.com/louis296/mesence-communicate/pkg/util"
 	"net"
 	"sync"
@@ -66,7 +66,7 @@ func (conn *UserConn) StartReadMessage() {
 		select {
 		case <-pingTicker.C:
 			log.Info("Send heart package")
-			heartPackage := &Message{Type: enum.HeartPackageMessageType}
+			heartPackage := &pb.Msg{Type: pb.Type_HeartPackage}
 			if err := conn.Send(util.Marshal(heartPackage)); err != nil {
 				log.Error("Send heart package error on user [%v] conn", conn.UserPhone)
 				pingTicker.Stop()
@@ -79,11 +79,11 @@ func (conn *UserConn) StartReadMessage() {
 	}
 }
 
-func (conn *UserConn) Send(message string) error {
-	log.Info("Send data: %s", message)
+func (conn *UserConn) Send(bs []byte) error {
+	log.Info("Send data: %v", bs)
 	conn.mutex.Lock()
 	defer conn.mutex.Unlock()
-	return conn.socket.WriteMessage(websocket.TextMessage, []byte(message))
+	return conn.socket.WriteMessage(websocket.BinaryMessage, bs)
 }
 
 func (conn *UserConn) Close() {
