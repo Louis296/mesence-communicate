@@ -20,3 +20,14 @@ func GetFriendRelationsByUserPhone(phone string) ([]model.FriendRelation, error)
 	}
 	return ans, nil
 }
+
+func GetFriendRelationByUserAndFriend(user, friend string) (*model.FriendRelation, error) {
+	sql := DB
+	sql = sql.Model(&model.FriendRelation{})
+	var ans model.FriendRelation
+	err := sql.Where("user_phone=? and friend_phone=?", user, friend).First(&ans).Error
+	if err != nil {
+		return nil, err
+	}
+	return &ans, nil
+}

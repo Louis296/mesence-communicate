@@ -25,10 +25,13 @@ func (r *FinishFriendRequestReq) Handler(c *gin.Context) (interface{}, error) {
 	if user.Phone != friendRequest.Candidate {
 		return nil, errors.New("Friend request must finished by candidate ")
 	}
+	if friendRequest.RequestStatus != 2 {
+		return nil, errors.New("Friend request already finish ")
+	}
 	if r.Type == 1 {
-		friendRequest.RequestStatus = 1
+		friendRequest.RequestStatus = int(pb.RequestStatus_Accepted)
 	} else {
-		friendRequest.RequestStatus = 2
+		friendRequest.RequestStatus = int(pb.RequestStatus_Refused)
 	}
 
 	tx := dao.DB.Begin()

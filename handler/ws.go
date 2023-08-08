@@ -8,7 +8,6 @@ import (
 	"github.com/louis296/mesence-communicate/pkg/ws"
 	"github.com/louis296/mesence-communicate/service/communicate_service"
 	"net/http"
-	"time"
 )
 
 var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool {
@@ -18,7 +17,7 @@ var upgrader = websocket.Upgrader{CheckOrigin: func(r *http.Request) bool {
 func WebSocketHandler(c *gin.Context) {
 	token := c.Query("Token")
 	claims, err := jwt.ParseToken(token)
-	if err != nil || claims.ExpiresAt < time.Now().Unix() {
+	if err != nil {
 		c.JSON(200, gin.H{"Message": "do not have token or token invalid"})
 		c.Abort()
 		return

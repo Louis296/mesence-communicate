@@ -38,8 +38,13 @@ func NewUserConn(socket *websocket.Conn) *UserConn {
 		"")
 	// closed by client
 	conn.socket.SetCloseHandler(func(code int, text string) error {
-		conn.Emit("close", code, text)
+		conn.mutex.Lock()
 		conn.closed = true
+		conn.mutex.Unlock()
+
+		log.Warn("[UserConnClose]--%d--%s", code, text)
+		conn.Emit("close", code, text)
+		UserConnMap.Delete(conn.UserPhone)
 		return nil
 	})
 	return conn
@@ -68,6 +73,9 @@ func (conn *UserConn) StartReadMessage() {
 			_, message, err := c.ReadMessage()
 			if err != nil {
 				log.Warn("Get error: %v, user conn may closed", err.Error())
+				if conn.closed {
+					break
+				}
 				if e, ok := err.(*websocket.CloseError); ok {
 					conn.Emit("close", e.Code, e.Text)
 				} else if e, ok := err.(*net.OpError); ok {
@@ -103,6 +111,7 @@ func (conn *UserConn) Send(bs []byte) error {
 	return conn.socket.WriteMessage(websocket.BinaryMessage, bs)
 }
 
+// Close 主动关闭用户连接
 func (conn *UserConn) Close() {
 	defer UserConnPool.Put(conn)
 	conn.mutex.Lock()

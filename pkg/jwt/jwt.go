@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"github.com/dgrijalva/jwt-go"
-	"time"
 )
 
 var Secret string
@@ -18,9 +17,9 @@ func GenerateToken(phone, name string) (string, error) {
 		Phone: phone,
 		Name:  name,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
-			Subject:   "mesence",
-			Issuer:    "mesence_louis296",
+			//ExpiresAt: time.Now().Add(24 * time.Hour).Unix(),
+			Subject: "mesence",
+			Issuer:  "mesence_louis296",
 		},
 	}
 	tokenClaims := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

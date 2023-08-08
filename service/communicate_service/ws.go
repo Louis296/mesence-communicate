@@ -1,6 +1,7 @@
 package communicate_service
 
 import (
+	"errors"
 	"github.com/golang/protobuf/proto"
 	"github.com/louis296/mesence-communicate/dao"
 	"github.com/louis296/mesence-communicate/dao/model"
@@ -9,6 +10,7 @@ import (
 	"github.com/louis296/mesence-communicate/pkg/pb"
 	"github.com/louis296/mesence-communicate/pkg/util"
 	"github.com/louis296/mesence-communicate/pkg/ws"
+	"gorm.io/gorm"
 )
 
 func UserConnHandler(conn *ws.UserConn) {
@@ -49,15 +51,14 @@ func UserConnHandler(conn *ws.UserConn) {
 
 	// handler close event
 	conn.On("close", func(code int, text string) {
-		log.Warn("[UserConnClose]--%d--%s", code, text)
 		// send offline notice to friends
 		friendPhones, err := getFriendPhones(conn)
 		if err != nil {
 			log.Error("Search user friends error, offline notify abort")
 			return
 		}
-		offlineNotify(conn, friendPhones)
-		ws.UserConnMap.Delete(conn.UserPhone)
+		offlineNotify(conn.UserPhone, friendPhones)
+		ws.UserConnPool.Put(conn)
 	})
 }
 
@@ -103,11 +104,25 @@ func onFriendRequest(conn *ws.UserConn, msg *pb.Msg) {
 		return
 	}
 
+	// check if friend relation already exist
+	_, err = dao.GetFriendRelationByUserAndFriend(conn.UserPhone, data.To)
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Error("Friend relation already exist")
+		return
+	}
+
+	// check if friend request already exist and not finish
+	_, err = dao.GetFriendRequestBySenderAndCandidateAndStatus(conn.UserPhone, data.To, 2)
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		log.Error("Friend request already exist")
+		return
+	}
+
 	// store friend request
 	friendRequest := model.FriendRequest{
 		Sender:        conn.UserPhone,
 		Candidate:     data.To,
-		RequestStatus: 0,
+		RequestStatus: int(pb.RequestStatus_Waiting),
 		StartTime:     util.TimeParse(data.SendTime),
 		Content:       data.Content,
 	}
@@ -136,7 +151,7 @@ func onFriendRequest(conn *ws.UserConn, msg *pb.Msg) {
 				Content:       data.Content,
 				SendTime:      data.SendTime,
 				To:            data.To,
-				RequestStatus: data.RequestStatus,
+				RequestStatus: pb.RequestStatus_Waiting,
 			},
 		}
 		err = candidateConn.Send(util.Marshal(notice))
@@ -176,10 +191,10 @@ func onlineNotify(conn *ws.UserConn, userPhones []string) {
 	}
 }
 
-func offlineNotify(conn *ws.UserConn, userPhones []string) {
+func offlineNotify(userPhone string, userPhones []string) {
 	message := &pb.Msg{
 		Type: pb.Type_Offline,
-		Data: &pb.Data{OfflineUsers: []string{conn.UserPhone}},
+		Data: &pb.Data{OfflineUsers: []string{userPhone}},
 	}
 	for _, userPhone := range userPhones {
 		if item, ok := ws.UserConnMap.Load(userPhone); ok {

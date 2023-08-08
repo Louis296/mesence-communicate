@@ -53,3 +53,14 @@ func GetFriendRequestById(id int) (*model.FriendRequest, error) {
 	}
 	return &ans, nil
 }
+
+func GetFriendRequestBySenderAndCandidateAndStatus(sender, candidate string, status int) (*model.FriendRequest, error) {
+	sql := DB
+	sql = sql.Model(&model.FriendRequest{})
+	var ans model.FriendRequest
+	err := sql.Where("sender=? and candidate=? and request_status=?", sender, candidate, status).First(&ans).Error
+	if err != nil {
+		return nil, err
+	}
+	return &ans, nil
+}
