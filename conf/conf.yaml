@@ -1,6 +1,6 @@
 server:
   port: 9010
-database:
+mysql:
   url: 127.0.0.1:3306
   userName: root
   password: 137238fh
@@ -11,3 +11,7 @@ jwt:
   secret: DkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM
 mongodb:
   url: 127.0.0.1:27017
+  database: mesence
+kafka:
+  url: 127.0.0.1:9092
+  topic: "msgToStoreAndTransfer"

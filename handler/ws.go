@@ -22,13 +22,31 @@ func WebSocketHandler(c *gin.Context) {
 		c.Abort()
 		return
 	}
+
+	// check if user already online, and force offline the online user
+	if v, ok := ws.UserConnMap.Load(claims.Phone); ok {
+		conn := v.(*ws.UserConn)
+		conn.Close()
+		ws.UserConnMap.Delete(claims.Phone)
+	}
+
 	socket, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Panic("%v", err)
 	}
 	userConn := ws.NewUserConn(socket)
-	//user := util.MustGetCurrentUser(c)
 	userConn.UserPhone = claims.Phone
-	communicate_service.UserConnHandler(userConn)
+	log.Info("Conn by user [%v] open", userConn.UserPhone)
+
+	// online notify
+	err = communicate_service.OnlineNotify(claims.Phone)
+	if err != nil {
+		log.Error(err.Error())
+	}
+
+	userConn.MsgHandler = communicate_service.HandleMessage
+	userConn.OnClose = communicate_service.OfflineNotify
+	ws.UserConnMap.Store(claims.Phone, userConn)
+
 	userConn.StartReadMessage()
 }

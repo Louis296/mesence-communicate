@@ -9,6 +9,7 @@ import (
 	"github.com/louis296/mesence-communicate/handler"
 	"github.com/louis296/mesence-communicate/middleware"
 	"github.com/louis296/mesence-communicate/pkg/jwt"
+	"github.com/louis296/mesence-communicate/pkg/kafka"
 	"github.com/louis296/mesence-communicate/pkg/mongodb"
 )
 
@@ -31,12 +32,12 @@ func Init(r *gin.Engine) {
 
 	// init database
 	err = dao.InitDB(
-		configure.Database.URL,
-		configure.Database.DatabaseName,
-		configure.Database.UserName,
-		configure.Database.Password,
-		configure.Database.MaxConn,
-		configure.Database.MaxOpen,
+		configure.MySQL.URL,
+		configure.MySQL.DatabaseName,
+		configure.MySQL.UserName,
+		configure.MySQL.Password,
+		configure.MySQL.MaxConn,
+		configure.MySQL.MaxOpen,
 	)
 	if err != nil {
 		panic(err.Error())
@@ -46,9 +47,15 @@ func Init(r *gin.Engine) {
 	jwt.Secret = configure.Jwt.Secret
 
 	// init mongodb
-	err = mongodb.InitClient(configure.MongoDB.Url)
+	err = mongodb.InitClient(configure.MongoDB.Url, configure.MongoDB.Database)
 	if err != nil {
 		panic(err.Error())
+	}
+
+	// init kafka
+	err = kafka.InitProducer(configure.Kafka.Url, configure.Kafka.Topic)
+	if err != nil {
+		panic(err)
 	}
 
 	err = r.Run(fmt.Sprintf(":%v", configure.Server.Port))

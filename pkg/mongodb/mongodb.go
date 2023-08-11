@@ -10,22 +10,25 @@ import (
 	"time"
 )
 
-var Client *mongo.Client
+var DB *mongo.Database
 
-func InitClient(url string) (err error) {
-	Client, err = mongo.Connect(context.Background(), options.Client().ApplyURI("mongodb://"+url))
-	return
+func InitClient(url, database string) error {
+	client, err := mongo.Connect(context.Background(), options.Client().ApplyURI("mongodb://"+url))
+	if err != nil {
+		return err
+	}
+	DB = client.Database(database)
+	return nil
 }
 
 func SaveMessage(msg *pb.Msg) error {
-	db := Client.Database("mesence")
 	message := Message{
 		Content:  msg.Data.Content,
 		From:     msg.Data.From,
 		To:       msg.Data.To,
 		SendTime: util.TimeParse(msg.Data.SendTime),
 	}
-	_, err := db.Collection("message").InsertOne(context.Background(), message)
+	_, err := DB.Collection("message").InsertOne(context.Background(), message)
 	if err != nil {
 		return err
 	}
@@ -40,8 +43,7 @@ func ListMessage(userA, userB string, offset, limit int64, startTime, endTime ti
 		},
 		"SendTime": bson.M{"$gte": startTime, "$lte": endTime},
 	}
-	db := Client.Database("mesence")
-	cur, err := db.Collection("message").Find(context.Background(), filter, options.Find().SetSkip((offset-1)*limit).SetLimit(limit))
+	cur, err := DB.Collection("message").Find(context.Background(), filter, options.Find().SetSkip((offset-1)*limit).SetLimit(limit))
 	if err != nil {
 		return nil, err
 	}

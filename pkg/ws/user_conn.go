@@ -1,12 +1,11 @@
 package ws
 
 import (
-	"github.com/chuckpreslar/emission"
+	"github.com/golang/protobuf/proto"
 	"github.com/gorilla/websocket"
 	"github.com/louis296/mesence-communicate/pkg/log"
 	"github.com/louis296/mesence-communicate/pkg/pb"
 	"github.com/louis296/mesence-communicate/pkg/util"
-	"net"
 	"sync"
 	"time"
 )
@@ -21,17 +20,18 @@ var UserConnPool = sync.Pool{New: func() interface{} {
 }}
 
 type UserConn struct {
-	emission.Emitter
 	socket    *websocket.Conn
 	mutex     *sync.Mutex
 	closed    bool
 	UserPhone string
+
+	MsgHandler func(*pb.Msg)
+	OnClose    func(string) error
 }
 
 func NewUserConn(socket *websocket.Conn) *UserConn {
 	conn := UserConnPool.Get().(*UserConn)
 	conn.ResetUserConn(
-		*emission.NewEmitter(),
 		socket,
 		new(sync.Mutex),
 		false,
@@ -43,20 +43,22 @@ func NewUserConn(socket *websocket.Conn) *UserConn {
 		conn.mutex.Unlock()
 
 		log.Warn("[UserConnClose]--%d--%s", code, text)
-		conn.Emit("close", code, text)
+		err := conn.OnClose(conn.UserPhone)
+		if err != nil {
+			log.Error(err.Error())
+		}
 		UserConnMap.Delete(conn.UserPhone)
+		UserConnPool.Put(conn)
 		return nil
 	})
 	return conn
 }
 
 func (conn *UserConn) ResetUserConn(
-	emitter emission.Emitter,
 	socket *websocket.Conn,
 	mutex *sync.Mutex,
 	closed bool,
 	userPhone string) {
-	conn.Emitter = emitter
 	conn.socket = socket
 	conn.mutex = mutex
 	conn.closed = closed
@@ -72,15 +74,7 @@ func (conn *UserConn) StartReadMessage() {
 		for {
 			_, message, err := c.ReadMessage()
 			if err != nil {
-				log.Warn("Get error: %v, user conn may closed", err.Error())
-				if conn.closed {
-					break
-				}
-				if e, ok := err.(*websocket.CloseError); ok {
-					conn.Emit("close", e.Code, e.Text)
-				} else if e, ok := err.(*net.OpError); ok {
-					conn.Emit("close", 1008, e.Error())
-				}
+				log.Warn("Get error when read message: %v, user conn may closed", err.Error())
 				break
 			}
 			in <- message
@@ -99,7 +93,12 @@ func (conn *UserConn) StartReadMessage() {
 			}
 		case message := <-in:
 			log.Info("Receive data: %v from user [%v]", string(message), conn.UserPhone)
-			conn.Emit("message", message)
+			msg := &pb.Msg{}
+			err := proto.Unmarshal(message, msg)
+			if err == nil {
+				msg.Data.From = conn.UserPhone
+				conn.MsgHandler(msg)
+			}
 		}
 	}
 }

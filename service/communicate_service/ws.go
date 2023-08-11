@@ -2,7 +2,6 @@ package communicate_service
 
 import (
 	"errors"
-	"github.com/golang/protobuf/proto"
 	"github.com/louis296/mesence-communicate/dao"
 	"github.com/louis296/mesence-communicate/dao/model"
 	"github.com/louis296/mesence-communicate/pkg/log"
@@ -13,56 +12,65 @@ import (
 	"gorm.io/gorm"
 )
 
-func UserConnHandler(conn *ws.UserConn) {
-	log.Info("Conn by user [%v] open", conn.UserPhone)
+//func UserConnHandler(conn *ws.UserConn) {
+//	log.Info("Conn by user [%v] open", conn.UserPhone)
+//
+//	// store user conn
+//	ws.UserConnMap.Store(conn.UserPhone, conn)
+//
+//	// send online notice to friends
+//	OnlineNotify(conn.UserPhone)
+//
+//	// handler message event
+//	conn.On("message", func(bs []byte) {
+//		msg := &pb.Msg{}
+//		if err := proto.Unmarshal(bs, msg); err != nil {
+//			log.Error("Cannot unmarshal message from user [%v], message: %v", conn.UserPhone, bs)
+//			return
+//		}
+//		switch msg.Type {
+//		case pb.Type_Word:
+//			onWord(conn, msg)
+//		case pb.Type_FriendRequest:
+//			onFriendRequest(conn, msg)
+//		case pb.Type_Offer:
+//			fallthrough
+//		case pb.Type_Answer:
+//			fallthrough
+//		case pb.Type_Candidate:
+//			onTransfer(conn, msg)
+//		}
+//	})
+//
+//	// handler close event
+//	conn.On("close", func(code int, text string) {
+//		// send offline notice to friends
+//		friendPhones, err := getFriendPhones(conn)
+//		if err != nil {
+//			log.Error("Search user friends error, offline notify abort")
+//			return
+//		}
+//		OfflineNotify(conn.UserPhone, friendPhones)
+//		ws.UserConnPool.Put(conn)
+//	})
+//}
 
-	//todo: check if user already online, and force offline the online user
-
-	// store user conn
-	ws.UserConnMap.Store(conn.UserPhone, conn)
-
-	// send online notice to friends
-	friendPhones, err := getFriendPhones(conn)
-	if err != nil {
-		log.Error("Search user friends error, online notify abort")
+func HandleMessage(msg *pb.Msg) {
+	switch msg.Type {
+	case pb.Type_Word:
+		onWord(msg)
+	case pb.Type_FriendRequest:
+		onFriendRequest(msg)
+	case pb.Type_Offer:
+		fallthrough
+	case pb.Type_Answer:
+		fallthrough
+	case pb.Type_Candidate:
+		onTransfer(msg)
 	}
-	onlineNotify(conn, friendPhones)
-
-	// handler message event
-	conn.On("message", func(bs []byte) {
-		msg := &pb.Msg{}
-		if err := proto.Unmarshal(bs, msg); err != nil {
-			log.Error("Cannot unmarshal message from user [%v], message: %v", conn.UserPhone, bs)
-			return
-		}
-		switch msg.Type {
-		case pb.Type_Word:
-			onWord(conn, msg)
-		case pb.Type_FriendRequest:
-			onFriendRequest(conn, msg)
-		case pb.Type_Offer:
-			fallthrough
-		case pb.Type_Answer:
-			fallthrough
-		case pb.Type_Candidate:
-			onTransfer(conn, msg)
-		}
-	})
-
-	// handler close event
-	conn.On("close", func(code int, text string) {
-		// send offline notice to friends
-		friendPhones, err := getFriendPhones(conn)
-		if err != nil {
-			log.Error("Search user friends error, offline notify abort")
-			return
-		}
-		offlineNotify(conn.UserPhone, friendPhones)
-		ws.UserConnPool.Put(conn)
-	})
 }
 
-func onWord(conn *ws.UserConn, msg *pb.Msg) {
+func onWord(msg *pb.Msg) {
 	data := msg.Data
 
 	// check if receiver is valid
@@ -83,7 +91,6 @@ func onWord(conn *ws.UserConn, msg *pb.Msg) {
 	if item, ok := ws.UserConnMap.Load(data.To); ok {
 		receiverConn := item.(*ws.UserConn)
 		sendMessage := &pb.Msg{Type: pb.Type_Word}
-		data.From = conn.UserPhone
 		sendMessage.Data = data
 		err = receiverConn.Send(util.Marshal(sendMessage))
 		if err != nil {
@@ -94,7 +101,7 @@ func onWord(conn *ws.UserConn, msg *pb.Msg) {
 	}
 }
 
-func onFriendRequest(conn *ws.UserConn, msg *pb.Msg) {
+func onFriendRequest(msg *pb.Msg) {
 	data := msg.Data
 
 	// check if candidate is valid
@@ -105,14 +112,14 @@ func onFriendRequest(conn *ws.UserConn, msg *pb.Msg) {
 	}
 
 	// check if friend relation already exist
-	_, err = dao.GetFriendRelationByUserAndFriend(conn.UserPhone, data.To)
+	_, err = dao.GetFriendRelationByUserAndFriend(data.From, data.To)
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Error("Friend relation already exist")
 		return
 	}
 
 	// check if friend request already exist and not finish
-	_, err = dao.GetFriendRequestBySenderAndCandidateAndStatus(conn.UserPhone, data.To, 2)
+	_, err = dao.GetFriendRequestBySenderAndCandidateAndStatus(data.From, data.To, 2)
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Error("Friend request already exist")
 		return
@@ -120,7 +127,7 @@ func onFriendRequest(conn *ws.UserConn, msg *pb.Msg) {
 
 	// store friend request
 	friendRequest := model.FriendRequest{
-		Sender:        conn.UserPhone,
+		Sender:        data.From,
 		Candidate:     data.To,
 		RequestStatus: int(pb.RequestStatus_Waiting),
 		StartTime:     util.TimeParse(data.SendTime),
@@ -147,7 +154,7 @@ func onFriendRequest(conn *ws.UserConn, msg *pb.Msg) {
 		notice := &pb.Msg{
 			Type: pb.Type_FriendRequest,
 			Data: &pb.Data{
-				From:          conn.UserPhone,
+				From:          data.From,
 				Content:       data.Content,
 				SendTime:      data.SendTime,
 				To:            data.To,
@@ -163,10 +170,9 @@ func onFriendRequest(conn *ws.UserConn, msg *pb.Msg) {
 	}
 }
 
-func onTransfer(conn *ws.UserConn, msg *pb.Msg) {
+func onTransfer(msg *pb.Msg) {
 	if item, ok := ws.UserConnMap.Load(msg.Data.To); ok {
 		receiverConn := item.(*ws.UserConn)
-		msg.Data.From = conn.UserPhone
 		err := receiverConn.Send(util.Marshal(msg))
 		if err != nil {
 			log.Error("Send word message to user [%v] error", receiverConn.UserPhone)
@@ -176,44 +182,42 @@ func onTransfer(conn *ws.UserConn, msg *pb.Msg) {
 	}
 }
 
-func onlineNotify(conn *ws.UserConn, userPhones []string) {
+func OnlineNotify(userPhone string) error {
+	friends, err := dao.GetFriendRelationsByUserPhone(userPhone)
+	if err != nil {
+		return err
+	}
 	message := &pb.Msg{
 		Type: pb.Type_Online,
-		Data: &pb.Data{OnlineUsers: []string{conn.UserPhone}},
+		Data: &pb.Data{OnlineUsers: []string{userPhone}},
 	}
-	for _, userPhone := range userPhones {
-		if item, ok := ws.UserConnMap.Load(userPhone); ok {
+	for _, friend := range friends {
+		if item, ok := ws.UserConnMap.Load(friend.UserPhone); ok {
 			userConn := item.(*ws.UserConn)
 			if err := userConn.Send(util.Marshal(message)); err != nil {
 				log.Error("Send online notify to user [%v] error", userPhone)
 			}
 		}
 	}
+	return nil
 }
 
-func offlineNotify(userPhone string, userPhones []string) {
+func OfflineNotify(userPhone string) error {
+	friends, err := dao.GetFriendRelationsByUserPhone(userPhone)
+	if err != nil {
+		return err
+	}
 	message := &pb.Msg{
 		Type: pb.Type_Offline,
-		Data: &pb.Data{OfflineUsers: []string{userPhone}},
+		Data: &pb.Data{OnlineUsers: []string{userPhone}},
 	}
-	for _, userPhone := range userPhones {
-		if item, ok := ws.UserConnMap.Load(userPhone); ok {
+	for _, friend := range friends {
+		if item, ok := ws.UserConnMap.Load(friend.UserPhone); ok {
 			userConn := item.(*ws.UserConn)
 			if err := userConn.Send(util.Marshal(message)); err != nil {
 				log.Error("Send offline notify to user [%v] error", userPhone)
 			}
 		}
 	}
-}
-
-func getFriendPhones(conn *ws.UserConn) ([]string, error) {
-	friendRelations, err := dao.GetFriendRelationsByUserPhone(conn.UserPhone)
-	if err != nil {
-		return nil, err
-	}
-	var friendPhones []string
-	for _, relation := range friendRelations {
-		friendPhones = append(friendPhones, relation.FriendPhone)
-	}
-	return friendPhones, nil
+	return nil
 }

@@ -6,15 +6,16 @@ import (
 )
 
 type Conf struct {
-	Server   Server   `yaml:"server"`
-	Database Database `yaml:"database"`
-	Jwt      Jwt      `yaml:"jwt"`
-	MongoDB  MongoDB  `yaml:"mongodb"`
+	Server  Server  `yaml:"server"`
+	MySQL   MySQL   `yaml:"mysql"`
+	Jwt     Jwt     `yaml:"jwt"`
+	MongoDB MongoDB `yaml:"mongodb"`
+	Kafka   Kafka   `yaml:"kafka"`
 }
 type Server struct {
 	Port int `yaml:"port"`
 }
-type Database struct {
+type MySQL struct {
 	URL          string `yaml:"url"`
 	UserName     string `yaml:"userName"`
 	Password     string `yaml:"password"`
@@ -26,7 +27,12 @@ type Jwt struct {
 	Secret string `yaml:"secret"`
 }
 type MongoDB struct {
-	Url string `yaml:"url"`
+	Url      string `yaml:"url"`
+	Database string `yaml:"database"`
+}
+type Kafka struct {
+	Url   string `yaml:"url"`
+	Topic string `yaml:"topic"`
 }
 
 func GetConf() (Conf, error) {
