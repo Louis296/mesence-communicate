@@ -12,6 +12,7 @@ import (
 	"github.com/louis296/mesence-communicate/pkg/kafka"
 	"github.com/louis296/mesence-communicate/pkg/mongodb"
 	"github.com/louis296/mesence-communicate/pkg/redis_client"
+	"github.com/louis296/mesence-communicate/service/communicate_service"
 )
 
 func Init(r *gin.Engine) {
@@ -55,6 +56,10 @@ func Init(r *gin.Engine) {
 
 	// init kafka
 	err = kafka.InitProducer(configure.Kafka.Url, configure.Kafka.Topic)
+	if err != nil {
+		panic(err)
+	}
+	err = kafka.InitConsumer(communicate_service.MsgFromMQConsumer, configure.Kafka.Url, configure.Kafka.Topic)
 	if err != nil {
 		panic(err)
 	}

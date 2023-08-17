@@ -1,17 +1,15 @@
 package communicate_service
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"github.com/louis296/mesence-communicate/dao"
-	"github.com/louis296/mesence-communicate/dao/model"
+	"github.com/louis296/mesence-communicate/pkg/kafka"
 	"github.com/louis296/mesence-communicate/pkg/log"
-	"github.com/louis296/mesence-communicate/pkg/mongodb"
 	"github.com/louis296/mesence-communicate/pkg/pb"
 	"github.com/louis296/mesence-communicate/pkg/redis_client"
 	"github.com/louis296/mesence-communicate/pkg/util"
 	"github.com/louis296/mesence-communicate/pkg/ws"
-	"gorm.io/gorm"
 )
 
 func HandleMessage(msg *pb.Msg, conn *ws.UserConn) {
@@ -35,103 +33,17 @@ func HandleMessage(msg *pb.Msg, conn *ws.UserConn) {
 }
 
 func handleWord(msg *pb.Msg) (*pb.Msg, error) {
-	data := msg.Data
-
-	// check if receiver is valid
-	_, err := dao.GetUserByPhone(data.To)
+	_, _, err := kafka.ProducerClient.SendMessage(context.Background(), GenConversationKey(msg.Data.From, msg.Data.To), msg)
 	if err != nil {
-		log.Error("No user [%v] or mongodb error, send word message abort", data.To)
 		return msg, err
-	}
-
-	// store message
-	err = mongodb.SaveMessage(msg)
-	if err != nil {
-		log.Error("Save message error")
-		return msg, err
-	}
-
-	// try to send message
-	if item, ok := ws.UserConnMap.Load(data.To); ok {
-		receiverConn := item.(*ws.UserConn)
-		sendMessage := &pb.Msg{Type: pb.Type_Word}
-		sendMessage.Data = data
-		err = receiverConn.Send(util.Marshal(sendMessage))
-		if err != nil {
-			log.Error("Send word message to user [%v] error", receiverConn.UserPhone)
-		}
-	} else {
-		log.Warn("Word message receiver [%v] is offline, send abort", data.To)
 	}
 	return msg, nil
 }
 
 func handleFriendRequest(msg *pb.Msg) (*pb.Msg, error) {
-	data := msg.Data
-
-	// check if candidate is valid
-	_, err := dao.GetUserByPhone(data.To)
+	_, _, err := kafka.ProducerClient.SendMessage(context.Background(), GenConversationKey(msg.Data.From, msg.Data.To), msg)
 	if err != nil {
-		log.Error("No user [%v] or db error, send word message abort", data.Candidate)
 		return msg, err
-	}
-
-	// check if friend relation already exist
-	_, err = dao.GetFriendRelationByUserAndFriend(data.From, data.To)
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Error("Friend relation already exist")
-		return msg, err
-	}
-
-	// check if friend request already exist and not finish
-	_, err = dao.GetFriendRequestBySenderAndCandidateAndStatus(data.From, data.To, 2)
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		log.Error("Friend request already exist")
-		return msg, err
-	}
-
-	// store friend request
-	friendRequest := model.FriendRequest{
-		Sender:        data.From,
-		Candidate:     data.To,
-		RequestStatus: int(pb.RequestStatus_Waiting),
-		StartTime:     util.TimeParse(data.SendTime),
-		Content:       data.Content,
-	}
-	tx := dao.DB.Begin()
-	defer func() {
-		if tx.Error != nil {
-			tx.Rollback()
-		} else if recover() != nil {
-			tx.Rollback()
-		} else {
-			tx.Commit()
-		}
-	}()
-	if err = dao.CreateFriendRequest(tx, friendRequest); err != nil {
-		log.Error("Store request to mongodb error")
-		return msg, err
-	}
-
-	// try to send friend request notice
-	if item, ok := ws.UserConnMap.Load(data.To); ok {
-		candidateConn := item.(*ws.UserConn)
-		notice := &pb.Msg{
-			Type: pb.Type_FriendRequest,
-			Data: &pb.Data{
-				From:          data.From,
-				Content:       data.Content,
-				SendTime:      data.SendTime,
-				To:            data.To,
-				RequestStatus: pb.RequestStatus_Waiting,
-			},
-		}
-		err = candidateConn.Send(util.Marshal(notice))
-		if err != nil {
-			log.Error("Send word message to user [%v] error", candidateConn.UserPhone)
-		}
-	} else {
-		log.Warn("Friend request receiver [%v] is offline, send abort", data.Candidate)
 	}
 	return msg, nil
 }
@@ -167,10 +79,10 @@ func PushMessage(msg *pb.Msg) {
 		receiverConn := item.(*ws.UserConn)
 		err := receiverConn.Send(util.Marshal(msg))
 		if err != nil {
-			log.Error("Send word message to user [%v] error", receiverConn.UserPhone)
+			log.Error("Push message to user [%v] error", receiverConn.UserPhone)
 		}
 	} else {
-		log.Warn("Word message receiver [%v] is offline, send abort", msg.Data.To)
+		log.Warn("receiver [%v] is offline, push message abort", msg.Data.To)
 	}
 }
 
