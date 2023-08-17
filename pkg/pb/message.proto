@@ -5,6 +5,7 @@ option go_package="github.com/louis296/mesence-communicate/pkg/pb";
 message Msg{
   Type type=1;
   Data data=2;
+  int64 seq=3;
 }
 
 message Data{
@@ -33,4 +34,10 @@ enum Type{
   Offer=5;
   Answer=6;
   Candidate=7;
+  GetMaxSeq=8;
+}
+
+message Resp{
+  string errStr=1;
+  Msg msg=2;
 }

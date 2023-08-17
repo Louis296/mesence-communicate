@@ -2,89 +2,53 @@ package communicate_service
 
 import (
 	"errors"
+	"fmt"
 	"github.com/louis296/mesence-communicate/dao"
 	"github.com/louis296/mesence-communicate/dao/model"
 	"github.com/louis296/mesence-communicate/pkg/log"
 	"github.com/louis296/mesence-communicate/pkg/mongodb"
 	"github.com/louis296/mesence-communicate/pkg/pb"
+	"github.com/louis296/mesence-communicate/pkg/redis_client"
 	"github.com/louis296/mesence-communicate/pkg/util"
 	"github.com/louis296/mesence-communicate/pkg/ws"
 	"gorm.io/gorm"
 )
 
-//func UserConnHandler(conn *ws.UserConn) {
-//	log.Info("Conn by user [%v] open", conn.UserPhone)
-//
-//	// store user conn
-//	ws.UserConnMap.Store(conn.UserPhone, conn)
-//
-//	// send online notice to friends
-//	OnlineNotify(conn.UserPhone)
-//
-//	// handler message event
-//	conn.On("message", func(bs []byte) {
-//		msg := &pb.Msg{}
-//		if err := proto.Unmarshal(bs, msg); err != nil {
-//			log.Error("Cannot unmarshal message from user [%v], message: %v", conn.UserPhone, bs)
-//			return
-//		}
-//		switch msg.Type {
-//		case pb.Type_Word:
-//			onWord(conn, msg)
-//		case pb.Type_FriendRequest:
-//			onFriendRequest(conn, msg)
-//		case pb.Type_Offer:
-//			fallthrough
-//		case pb.Type_Answer:
-//			fallthrough
-//		case pb.Type_Candidate:
-//			onTransfer(conn, msg)
-//		}
-//	})
-//
-//	// handler close event
-//	conn.On("close", func(code int, text string) {
-//		// send offline notice to friends
-//		friendPhones, err := getFriendPhones(conn)
-//		if err != nil {
-//			log.Error("Search user friends error, offline notify abort")
-//			return
-//		}
-//		OfflineNotify(conn.UserPhone, friendPhones)
-//		ws.UserConnPool.Put(conn)
-//	})
-//}
-
-func HandleMessage(msg *pb.Msg) {
+func HandleMessage(msg *pb.Msg, conn *ws.UserConn) {
+	var err error
+	var resp *pb.Msg
 	switch msg.Type {
 	case pb.Type_Word:
-		onWord(msg)
+		resp, err = handleWord(msg)
 	case pb.Type_FriendRequest:
-		onFriendRequest(msg)
+		resp, err = handleFriendRequest(msg)
+	case pb.Type_GetMaxSeq:
+		resp, err = handleGetMaxSeq(msg)
 	case pb.Type_Offer:
 		fallthrough
 	case pb.Type_Answer:
 		fallthrough
 	case pb.Type_Candidate:
-		onTransfer(msg)
+		resp, err = doTransfer(msg)
 	}
+	doReply(conn, resp, err)
 }
 
-func onWord(msg *pb.Msg) {
+func handleWord(msg *pb.Msg) (*pb.Msg, error) {
 	data := msg.Data
 
 	// check if receiver is valid
 	_, err := dao.GetUserByPhone(data.To)
 	if err != nil {
 		log.Error("No user [%v] or mongodb error, send word message abort", data.To)
-		return
+		return msg, err
 	}
 
 	// store message
 	err = mongodb.SaveMessage(msg)
 	if err != nil {
 		log.Error("Save message error")
-		return
+		return msg, err
 	}
 
 	// try to send message
@@ -99,30 +63,31 @@ func onWord(msg *pb.Msg) {
 	} else {
 		log.Warn("Word message receiver [%v] is offline, send abort", data.To)
 	}
+	return msg, nil
 }
 
-func onFriendRequest(msg *pb.Msg) {
+func handleFriendRequest(msg *pb.Msg) (*pb.Msg, error) {
 	data := msg.Data
 
 	// check if candidate is valid
 	_, err := dao.GetUserByPhone(data.To)
 	if err != nil {
-		log.Error("No user [%v] or mongodb error, send word message abort", data.Candidate)
-		return
+		log.Error("No user [%v] or db error, send word message abort", data.Candidate)
+		return msg, err
 	}
 
 	// check if friend relation already exist
 	_, err = dao.GetFriendRelationByUserAndFriend(data.From, data.To)
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Error("Friend relation already exist")
-		return
+		return msg, err
 	}
 
 	// check if friend request already exist and not finish
 	_, err = dao.GetFriendRequestBySenderAndCandidateAndStatus(data.From, data.To, 2)
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		log.Error("Friend request already exist")
-		return
+		return msg, err
 	}
 
 	// store friend request
@@ -145,7 +110,7 @@ func onFriendRequest(msg *pb.Msg) {
 	}()
 	if err = dao.CreateFriendRequest(tx, friendRequest); err != nil {
 		log.Error("Store request to mongodb error")
-		return
+		return msg, err
 	}
 
 	// try to send friend request notice
@@ -168,9 +133,36 @@ func onFriendRequest(msg *pb.Msg) {
 	} else {
 		log.Warn("Friend request receiver [%v] is offline, send abort", data.Candidate)
 	}
+	return msg, nil
 }
 
-func onTransfer(msg *pb.Msg) {
+func handleGetMaxSeq(msg *pb.Msg) (*pb.Msg, error) {
+	seq, err := redis_client.GetMaxSeq(GenConversationKey(msg.Data.From, msg.Data.To))
+	if err != nil {
+		return msg, err
+	}
+	return &pb.Msg{
+		Type: pb.Type_GetMaxSeq,
+		Data: msg.Data,
+		Seq:  seq,
+	}, nil
+}
+
+func doTransfer(msg *pb.Msg) (*pb.Msg, error) {
+	if item, ok := ws.UserConnMap.Load(msg.Data.To); ok {
+		receiverConn := item.(*ws.UserConn)
+		err := receiverConn.Send(util.Marshal(msg))
+		if err != nil {
+			log.Error("Send word message to user [%v] error", receiverConn.UserPhone)
+			return msg, err
+		}
+	} else {
+		log.Warn("Word message receiver [%v] is offline, send abort", msg.Data.To)
+	}
+	return msg, nil
+}
+
+func PushMessage(msg *pb.Msg) {
 	if item, ok := ws.UserConnMap.Load(msg.Data.To); ok {
 		receiverConn := item.(*ws.UserConn)
 		err := receiverConn.Send(util.Marshal(msg))
@@ -220,4 +212,20 @@ func OfflineNotify(userPhone string) error {
 		}
 	}
 	return nil
+}
+
+func doReply(conn *ws.UserConn, msg *pb.Msg, err error) {
+	var errStr string
+	if err != nil {
+		errStr = err.Error()
+	}
+	resp := &pb.Resp{
+		ErrStr: errStr,
+		Msg:    msg,
+	}
+	conn.Send(util.Marshal(resp))
+}
+
+func GenConversationKey(from, to string) string {
+	return fmt.Sprintf("conversation_%v_%v", from, to)
 }

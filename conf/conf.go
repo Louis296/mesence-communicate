@@ -11,6 +11,7 @@ type Conf struct {
 	Jwt     Jwt     `yaml:"jwt"`
 	MongoDB MongoDB `yaml:"mongodb"`
 	Kafka   Kafka   `yaml:"kafka"`
+	Redis   Redis   `yaml:"redis"`
 }
 type Server struct {
 	Port int `yaml:"port"`
@@ -33,6 +34,11 @@ type MongoDB struct {
 type Kafka struct {
 	Url   string `yaml:"url"`
 	Topic string `yaml:"topic"`
+}
+type Redis struct {
+	Url      string `yaml:"url"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
 }
 
 func GetConf() (Conf, error) {

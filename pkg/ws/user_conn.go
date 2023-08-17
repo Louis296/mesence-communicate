@@ -25,7 +25,7 @@ type UserConn struct {
 	closed    bool
 	UserPhone string
 
-	MsgHandler func(*pb.Msg)
+	MsgHandler func(*pb.Msg, *UserConn)
 	OnClose    func(string) error
 }
 
@@ -97,7 +97,7 @@ func (conn *UserConn) StartReadMessage() {
 			err := proto.Unmarshal(message, msg)
 			if err == nil {
 				msg.Data.From = conn.UserPhone
-				conn.MsgHandler(msg)
+				conn.MsgHandler(msg, conn)
 			}
 		}
 	}

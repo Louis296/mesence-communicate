@@ -11,6 +11,7 @@ import (
 	"github.com/louis296/mesence-communicate/pkg/jwt"
 	"github.com/louis296/mesence-communicate/pkg/kafka"
 	"github.com/louis296/mesence-communicate/pkg/mongodb"
+	"github.com/louis296/mesence-communicate/pkg/redis_client"
 )
 
 func Init(r *gin.Engine) {
@@ -57,6 +58,9 @@ func Init(r *gin.Engine) {
 	if err != nil {
 		panic(err)
 	}
+
+	// init redis
+	redis_client.InitClient(configure.Redis.Url, configure.Redis.Password, configure.Redis.DB)
 
 	err = r.Run(fmt.Sprintf(":%v", configure.Server.Port))
 	if err != nil {

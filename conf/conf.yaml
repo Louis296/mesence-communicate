@@ -15,3 +15,7 @@ mongodb:
 kafka:
   url: 127.0.0.1:9092
   topic: "msgToStoreAndTransfer"
+redis:
+  url: 127.0.0.1:6379
+  password: 
+  db: 2

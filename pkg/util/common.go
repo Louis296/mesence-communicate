@@ -6,11 +6,10 @@ import (
 	"github.com/louis296/mesence-communicate/dao/model"
 	"github.com/louis296/mesence-communicate/pkg/enum"
 	"github.com/louis296/mesence-communicate/pkg/log"
-	"github.com/louis296/mesence-communicate/pkg/pb"
 	"time"
 )
 
-func Marshal(data *pb.Msg) []byte {
+func Marshal(data proto.Message) []byte {
 	if res, err := proto.Marshal(data); err != nil {
 		return nil
 	} else {
