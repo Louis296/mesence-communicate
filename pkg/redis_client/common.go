@@ -22,3 +22,11 @@ func GetMaxSeq(key string) (int64, error) {
 	}
 	return seq, nil
 }
+
+func INCRSeq(key string) (int64, error) {
+	seq, err := DB.Incr(context.Background(), key).Result()
+	if err != nil {
+		return -1, err
+	}
+	return seq, nil
+}

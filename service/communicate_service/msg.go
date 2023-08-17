@@ -9,6 +9,7 @@ import (
 	"github.com/louis296/mesence-communicate/pkg/log"
 	"github.com/louis296/mesence-communicate/pkg/mongodb"
 	"github.com/louis296/mesence-communicate/pkg/pb"
+	"github.com/louis296/mesence-communicate/pkg/redis_client"
 	"github.com/louis296/mesence-communicate/pkg/util"
 	"gorm.io/gorm"
 )
@@ -67,6 +68,14 @@ func handleWordMsgFromMQ(msg *pb.Msg) {
 		log.Error("Save message error")
 		return
 	}
+
+	// update seq
+	seq, err := redis_client.INCRSeq(GenConversationKey(msg.Data.From, msg.Data.To))
+	if err != nil {
+		log.Error(err.Error())
+		return
+	}
+	msg.Seq = seq
 
 	// push message
 	PushMessage(msg)
