@@ -7,7 +7,7 @@ import (
 )
 
 func TestSaveMessage(t *testing.T) {
-	err := InitClient("127.0.0.1:27017")
+	err := InitClient("127.0.0.1:27017", "test")
 	if err != nil {
 		t.FailNow()
 	}

@@ -96,8 +96,10 @@ func (conn *UserConn) StartReadMessage() {
 			msg := &pb.Msg{}
 			err := proto.Unmarshal(message, msg)
 			if err == nil {
-				msg.Data.From = conn.UserPhone
+				msg.UserId = conn.UserPhone
 				conn.MsgHandler(msg, conn)
+			} else {
+				log.Error(err.Error())
 			}
 		}
 	}

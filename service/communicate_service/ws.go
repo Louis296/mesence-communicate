@@ -22,6 +22,8 @@ func HandleMessage(msg *pb.Msg, conn *ws.UserConn) {
 		resp, err = handleFriendRequest(msg)
 	case pb.Type_GetMaxSeq:
 		resp, err = handleGetMaxSeq(msg)
+	case pb.Type_PullMessage:
+		resp, err = handlePullMessage(msg)
 	case pb.Type_Offer:
 		fallthrough
 	case pb.Type_Answer:
@@ -60,22 +62,21 @@ func handleGetMaxSeq(msg *pb.Msg) (*pb.Msg, error) {
 	}, nil
 }
 
-func doTransfer(msg *pb.Msg) (*pb.Msg, error) {
-	if item, ok := ws.UserConnMap.Load(msg.Data.To); ok {
-		receiverConn := item.(*ws.UserConn)
-		err := receiverConn.Send(util.Marshal(msg))
-		if err != nil {
-			log.Error("Send word message to user [%v] error", receiverConn.UserPhone)
-			return msg, err
-		}
-	} else {
-		log.Warn("Word message receiver [%v] is offline, send abort", msg.Data.To)
+func handlePullMessage(msg *pb.Msg) (*pb.Msg, error) {
+	_, _, err := kafka.ProducerClient.SendMessage(context.Background(), GenConversationKey(msg.Data.From, msg.Data.To), msg)
+	if err != nil {
+		return msg, err
 	}
 	return msg, nil
 }
 
-func PushMessage(msg *pb.Msg) {
-	if item, ok := ws.UserConnMap.Load(msg.Data.To); ok {
+func doTransfer(msg *pb.Msg) (*pb.Msg, error) {
+	PushMessage(msg, msg.Data.To)
+	return msg, nil
+}
+
+func PushMessage(msg *pb.Msg, userId string) {
+	if item, ok := ws.UserConnMap.Load(userId); ok {
 		receiverConn := item.(*ws.UserConn)
 		err := receiverConn.Send(util.Marshal(msg))
 		if err != nil {

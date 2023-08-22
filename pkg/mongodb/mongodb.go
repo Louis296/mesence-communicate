@@ -27,6 +27,8 @@ func SaveMessage(msg *pb.Msg) error {
 		From:     msg.Data.From,
 		To:       msg.Data.To,
 		SendTime: util.TimeParse(msg.Data.SendTime),
+		Seq:      msg.Seq,
+		Uuid:     msg.Data.Uuid,
 	}
 	_, err := DB.Collection("message").InsertOne(context.Background(), message)
 	if err != nil {
@@ -48,7 +50,24 @@ func ListMessage(userA, userB string, offset, limit int64, startTime, endTime ti
 		return nil, err
 	}
 	var res []Message
-	if err := cur.All(context.Background(), &res); err != nil {
+	if err = cur.All(context.Background(), &res); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func ListMessageBySeq(from, to string, seq int64) ([]Message, error) {
+	filter := bson.M{
+		"from": from,
+		"to":   to,
+		"seq":  bson.M{"$gte": seq},
+	}
+	cur, err := DB.Collection("message").Find(context.Background(), filter)
+	if err != nil {
+		return nil, err
+	}
+	var res []Message
+	if err = cur.All(context.Background(), &res); err != nil {
 		return nil, err
 	}
 	return res, nil

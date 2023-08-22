@@ -48,7 +48,8 @@ func handleMsgFromMQ(msgFromMQ *sarama.ConsumerMessage) {
 		handleWordMsgFromMQ(msg)
 	case pb.Type_FriendRequest:
 		handleFriendRequestMsgFromMQ(msg)
-
+	case pb.Type_PullMessage:
+		handlePullMsgReqFromMQ(msg)
 	}
 }
 
@@ -62,13 +63,6 @@ func handleWordMsgFromMQ(msg *pb.Msg) {
 		return
 	}
 
-	// store message
-	err = mongodb.SaveMessage(msg)
-	if err != nil {
-		log.Error("Save message error")
-		return
-	}
-
 	// update seq
 	seq, err := redis_client.INCRSeq(GenConversationKey(msg.Data.From, msg.Data.To))
 	if err != nil {
@@ -77,8 +71,15 @@ func handleWordMsgFromMQ(msg *pb.Msg) {
 	}
 	msg.Seq = seq
 
+	// store message
+	err = mongodb.SaveMessage(msg)
+	if err != nil {
+		log.Error("Save message error")
+		return
+	}
+
 	// push message
-	PushMessage(msg)
+	PushMessage(msg, msg.Data.To)
 }
 
 func handleFriendRequestMsgFromMQ(msg *pb.Msg) {
@@ -129,7 +130,30 @@ func handleFriendRequestMsgFromMQ(msg *pb.Msg) {
 	}
 
 	msg.Data.RequestStatus = pb.RequestStatus_Waiting
-	PushMessage(msg)
+	PushMessage(msg, msg.Data.To)
+}
 
-	return
+func handlePullMsgReqFromMQ(req *pb.Msg) {
+	// get msg
+	msgList, err := mongodb.ListMessageBySeq(req.Data.From, req.Data.To, req.Seq)
+	if err != nil {
+		log.Error(err.Error())
+		return
+	}
+
+	// push all message
+	for _, msg := range msgList {
+		pushMsg := &pb.Msg{
+			Type: pb.Type_Word,
+			Seq:  msg.Seq,
+			Data: &pb.Data{
+				To:       msg.To,
+				From:     msg.From,
+				Content:  msg.Content,
+				SendTime: util.TimeFormat(msg.SendTime),
+				Uuid:     msg.Uuid,
+			},
+		}
+		PushMessage(pushMsg, req.UserId)
+	}
 }

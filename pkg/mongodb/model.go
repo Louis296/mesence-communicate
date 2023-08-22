@@ -7,4 +7,6 @@ type Message struct {
 	From     string
 	To       string
 	SendTime time.Time
+	Seq      int64
+	Uuid     string
 }

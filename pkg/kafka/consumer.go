@@ -11,6 +11,10 @@ func InitConsumer(handler sarama.ConsumerGroupHandler, url, topic string) error 
 	if err != nil {
 		return err
 	}
-	go group.Consume(context.Background(), []string{topic}, handler)
+	go func() {
+		for {
+			group.Consume(context.Background(), []string{topic}, handler)
+		}
+	}()
 	return nil
 }
